@@ -33,17 +33,13 @@ import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 
 /*
  * This OpMode is an example driver-controlled (TeleOp) mode for the goBILDA 2024-2025 FTC
- * Into The Deep Starter Robot
- * The code is structured as a LinearOpMode
- *
- * This robot has a two-motor differential-steered (sometimes called tank or skid steer) drivetrain.
- * With a left and right drive motor.
- * The drive on this robot is controlled in an "Arcade" style, with the left stick Y axis
- * controlling the forward movement and the right stick X axis controlling rotation.
- * This allows easy transition to a standard "First Person" control of a
- * mecanum or omnidirectional chassis.
- *
- * The drive wheels are 96mm diameter traction (Rhino) or omni wheels.
+ * Into The Deep Starter Robot with 104mm GripForce™ Mecanum Wheels
+ * 
+ * This robot has a four-motor mecanum drive system.
+ * The drive is controlled with the left stick controlling forward/back and left/right movement,
+ * while the right stick X axis controls rotation.
+ * 
+ * The drive wheels are 104mm GripForce™ Mecanum Wheels.
  * They are driven by 2x 5203-2402-0019 312RPM Yellow Jacket Planetary Gearmotors.
  *
  * This robot's main scoring mechanism includes an arm powered by a motor, a "wrist" driven
@@ -66,13 +62,15 @@ import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
  */
 
 
-@TeleOp(name="FTC Starter Kit Example Robot (INTO THE DEEP)", group="Robot")
+@TeleOp(name="FTC Starter Kit Example Robot Mecanum (INTO THE DEEP)", group="Robot")
 //@Disabled
 public class ConceptGoBildaStarterKitRobotTeleop_IntoTheDeep extends LinearOpMode {
 
     /* Declare OpMode members. */
-    public DcMotor  leftDrive   = null; //the left drivetrain motor
-    public DcMotor  rightDrive  = null; //the right drivetrain motor
+    public DcMotor leftFrontDrive   = null;
+    public DcMotor rightFrontDrive  = null;
+    public DcMotor leftBackDrive    = null;
+    public DcMotor rightBackDrive   = null;
     public DcMotor  armMotor    = null; //the arm motor
     public CRServo  intake      = null; //the active intake servo
     public Servo    wrist       = null; //the wrist servo
@@ -135,30 +133,39 @@ public class ConceptGoBildaStarterKitRobotTeleop_IntoTheDeep extends LinearOpMod
         /*
         These variables are private to the OpMode, and are used to control the drivetrain.
          */
-        double left;
-        double right;
         double forward;
+        double strafe;
         double rotate;
-        double max;
+        double leftFrontPower;
+        double rightFrontPower;
+        double leftBackPower;
+        double rightBackPower;
+        double maxPower;
 
 
         /* Define and Initialize Motors */
-        leftDrive  = hardwareMap.get(DcMotor.class, "left_front_drive"); //the left drivetrain motor
-        rightDrive = hardwareMap.get(DcMotor.class, "right_front_drive"); //the right drivetrain motor
+        leftFrontDrive  = hardwareMap.get(DcMotor.class, "left_front_drive");
+        rightFrontDrive = hardwareMap.get(DcMotor.class, "right_front_drive");
+        leftBackDrive   = hardwareMap.get(DcMotor.class, "left_back_drive");
+        rightBackDrive  = hardwareMap.get(DcMotor.class, "right_back_drive");
         armMotor   = hardwareMap.get(DcMotor.class, "left_arm"); //the arm motor
 
 
         /* Most skid-steer/differential drive robots require reversing one motor to drive forward.
         for this robot, we reverse the right motor.*/
-        leftDrive.setDirection(DcMotor.Direction.FORWARD);
-        rightDrive.setDirection(DcMotor.Direction.REVERSE);
+        leftFrontDrive.setDirection(DcMotor.Direction.FORWARD);
+        rightFrontDrive.setDirection(DcMotor.Direction.REVERSE);
+        leftBackDrive.setDirection(DcMotor.Direction.FORWARD);
+        rightBackDrive.setDirection(DcMotor.Direction.REVERSE);
 
 
         /* Setting zeroPowerBehavior to BRAKE enables a "brake mode". This causes the motor to slow down
         much faster when it is coasting. This creates a much more controllable drivetrain. As the robot
         stops much quicker. */
-        leftDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rightDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        leftFrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightFrontDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        leftBackDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightBackDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         armMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         /*This sets the maximum current that the control hub will apply to the arm before throwing a flag */
@@ -194,6 +201,7 @@ public class ConceptGoBildaStarterKitRobotTeleop_IntoTheDeep extends LinearOpMod
             /* Set the drive and turn variables to follow the joysticks on the gamepad.
             the joysticks decrease as you push them up. So reverse the Y axis. */
             forward = -gamepad1.left_stick_y;
+            strafe  = gamepad1.left_stick_x;
             rotate  = gamepad1.right_stick_x;
 
 
@@ -203,20 +211,28 @@ public class ConceptGoBildaStarterKitRobotTeleop_IntoTheDeep extends LinearOpMod
             the right and left motors need to move in opposite directions. So we will add rotate to
             forward for the left motor, and subtract rotate from forward for the right motor. */
 
-            left  = forward + rotate;
-            right = forward - rotate;
+            leftFrontPower  = forward + strafe + rotate;
+            rightFrontPower = forward - strafe - rotate;
+            leftBackPower   = forward - strafe + rotate;
+            rightBackPower  = forward + strafe - rotate;
 
             /* Normalize the values so neither exceed +/- 1.0 */
-            max = Math.max(Math.abs(left), Math.abs(right));
-            if (max > 1.0)
-            {
-                left /= max;
-                right /= max;
+            maxPower = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
+            maxPower = Math.max(maxPower, Math.abs(leftBackPower));
+            maxPower = Math.max(maxPower, Math.abs(rightBackPower));
+
+            if (maxPower > 1.0) {
+                leftFrontPower  /= maxPower;
+                rightFrontPower /= maxPower;
+                leftBackPower   /= maxPower;
+                rightBackPower  /= maxPower;
             }
 
             /* Set the motor power to the variables we've mixed and normalized */
-            leftDrive.setPower(left);
-            rightDrive.setPower(right);
+            leftFrontDrive.setPower(leftFrontPower);
+            rightFrontDrive.setPower(rightFrontPower);
+            leftBackDrive.setPower(leftBackPower);
+            rightBackDrive.setPower(rightBackPower);
 
 
 
